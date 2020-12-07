@@ -53,13 +53,15 @@ class InvalidKey(Exception):
     pass
 
 class AES:
-    def __init__(self, master_key, num_rounds, key_string=True):
-        if(len(key_string)!=32):
+    def __init__(self, master_key, num_rounds):
+        if(len(master_key)!=32):
             raise InvalidKey("Invald Key Length")
-        if key_string:
+        if type(master_key) is str:
             mk=bytearray(master_key, 'utf-8')
-        else:
+        elif type(master_key) is bytes:
             mk=bytearray(master_key)
+        else:
+            raise InvalidKey("Invald Key Types")
         self.num_rounds=num_rounds 
         self.round_keys=[]
         word_array=[]

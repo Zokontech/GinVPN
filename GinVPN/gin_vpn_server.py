@@ -7,12 +7,8 @@ import time
 import sys
 from GinVPN.AES import AES
 import socket, string, random, requests,threading, queue
-
-
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-
-
 
 aes=None
 def format_response(r):
@@ -68,13 +64,19 @@ async def recv_msg(request):
         
 
 def main():
-    key="Vrz19NDnmgmqvJw0fm4R3Zadi7OLLVoA"
+    try:
+        import GinVPN.GinSettings
+        key=GinVPN.GinSettings.key
+        port=GinVPN.GinSettings.server_port
+    except ModuleNotFoundError:
+        print("Config Not Found, run GinConfig")
+        return
     global aes
     aes=AES.AES(key,14)
     app = web.Application()
     app.router.add_route('POST', '/', recv_msg)
     loop = asyncio.get_event_loop()
-    f = loop.create_server(app.make_handler(), '0.0.0.0', os.environ.get('PORT', '5000'))
+    f = loop.create_server(app.make_handler(), '0.0.0.0', os.environ.get('PORT', str(port)))
     srv = loop.run_until_complete(f)
     print('serving on', srv.sockets[0].getsockname())
     try:

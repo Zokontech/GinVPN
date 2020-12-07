@@ -24,9 +24,16 @@ class GinVPNPlugin(HttpProxyBasePlugin):
    
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        key="Vrz19NDnmgmqvJw0fm4R3Zadi7OLLVoA"
-        self.server='127.0.0.1'
-        self.port=5000
+        try:
+            import GinVPN.GinSettings
+            key=GinVPN.GinSettings.key
+            server=GinVPN.GinSettings.server_adr
+            port=GinVPN.GinSettings.server_port
+        except ModuleNotFoundError:
+            print("Config Not Found, Quit The Proxy and Run GinConfig")
+            sys.exit()
+        self.server=server
+        self.port=port
         self.serverurl=urlparse.SplitResultBytes(scheme="http", netloc=self.server+':'+str(self.port), path="/", query="",fragment="")
         self.aes=AES.AES(key,14)
         self.decrypt=False
