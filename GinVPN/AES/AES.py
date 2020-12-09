@@ -1,6 +1,7 @@
-
+#Alexander Krasny
 round_constants=(0x01, 0x02, 0x04,0x08,0x10,0x20,0x40)
 
+#array for s_box permutation transformation
 s_box = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -19,6 +20,7 @@ s_box = (
     0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF,
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16,
 )
+#array for reversed s_box permutation transformation
 inv_s_box = (
     0x52, 0x09, 0x6A, 0xD5, 0x30, 0x36, 0xA5, 0x38, 0xBF, 0x40, 0xA3, 0x9E, 0x81, 0xF3, 0xD7, 0xFB,
     0x7C, 0xE3, 0x39, 0x82, 0x9B, 0x2F, 0xFF, 0x87, 0x34, 0x8E, 0x43, 0x44, 0xC4, 0xDE, 0xE9, 0xCB,
@@ -37,11 +39,14 @@ inv_s_box = (
     0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61,
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 )
+#array for mix_colum operation permutation transformation
 column_mix=[
     [2,3,1,1],
     [1,2,3,1],
     [1,1,2,3],
     [3,1,1,2]]
+
+#array for reversing mix_colum operation permutation transformation
 inv_column_mix=[
     [0x0e,0x0b,0x0d,0x09],
     [0x09,0x0e,0x0b,0x0d],
@@ -49,11 +54,10 @@ inv_column_mix=[
     [0x0b,0x0d,0x09,0x0e]]
 
 class InvalidKey(Exception):
-    """Base class for other exceptions"""
     pass
 
 class AES:
-    def __init__(self, master_key, num_rounds):
+    def __init__(self, master_key): #generates round keys for encryption/decryption give 32byte master key
         if(len(master_key)!=32):
             raise InvalidKey("Invald Key Length")
         if type(master_key) is str:
@@ -62,18 +66,23 @@ class AES:
             mk=bytearray(master_key)
         else:
             raise InvalidKey("Invald Key Types")
-        self.num_rounds=num_rounds 
+        self.num_rounds=14
         self.round_keys=[]
         word_array=[]
         self.key_expansion(mk,word_array)
-        for i in range(0,num_rounds+1):
+        for i in range(0,self.num_rounds+1):
             self.round_keys.append(self.word_keys(word_array[4*i:4*i+4]))
-    def xor_bytes(self, a,b):
+
+    #key expansion functions 
+    def xor_bytes(self, a,b):#returns a bytes object containing a xor b
         return bytes(i^j for i, j in zip(a, b))
-    def sub_word(self, word):
+    def sub_word(self, word):#returns the s_box transformation on the bytes in word
         return bytes(s_box[i] for i in word)
-    def rot_word(self, word):
+    def rot_word(self, word):#returns the word rotated left one position
         return bytes([word[1]])+bytes([word[2]])+bytes([word[3]])+bytes([word[0]])
+
+    
+    #generates 60 words from the master key and stores them in word array by modifying the last word with the previous 3 methods as specified by AES standards.
     def key_expansion(self, key, word_array):
         key_length=int(len(key)/4)
         for i in range(0,key_length):
@@ -85,30 +94,34 @@ class AES:
             elif (key_length > 6 and i % key_length == 4):
                 temp = self.sub_word(temp)
             word_array.append(self.xor_bytes(word_array[i-key_length], temp))
+
     #encryption functions
-    def add_round_key(self, txt, key):
+    def add_round_key(self, txt, key):#returns txt xor-ed with key
         return bytearray([txt[i]^key[i] for i in range(0,len(txt))])
-    def sub_bytes(self, msg):
+    def sub_bytes(self, msg):#returns the s_box transformation of msg
         return bytearray([s_box[i] for i in msg])
-    def shift_rows(self, msg):
+    def shift_rows(self, msg):#returns msg with rows shifted as specified by AES standards
         return bytearray(
         [msg[0],msg[5],msg[10],msg[15],
         msg[4],msg[9],msg[14],msg[3],
         msg[8],msg[13],msg[2],msg[7],
         msg[12],msg[1],msg[6],msg[11]])
-    def multiply(self, b,a):
-        p = 0
+
+    #inspired by https://stackoverflow.com/questions/45442396/a-pure-python-way-to-calculate-the-multiplicative-inverse-in-gf28-using-pytho
+    def multiply(self, b,a): #return galios multiplication of b and a
+        res = 0
         for i in range(0,8):
-            if b & 1: p ^= a
-            hi_bit_set = a & 0x80
+            if b & 1: 
+                res ^= a
+            hi_set = a & 0x80
             a <<= 1
             a &= 0xFF
-            if hi_bit_set:
+            if hi_set:
                 a ^= 0x1b
             b >>= 1
-        return p
+        return res
 
-    def mix_col(self, col):
+    def mix_col(self, col):# returns col galios multiplied by the column_mix array.
         b=bytearray()
         for j in range(0,4):
             tmp=0x00
@@ -116,21 +129,26 @@ class AES:
                 tmp^=self.multiply(column_mix[j][i], col[i])
             b+=bytes([tmp])
         return b
-    def mix_cols(self, msg):
+
+    def mix_cols(self, msg):#return an bytearray made from concatenation of each column of message after mix_col
         b=bytearray()
         for i in range (0,4):
             b+=self.mix_col(msg[4*i:4*i+4])
         return(b)
+
+
     #decryption functions
-    def inv_sub_bytes(self, msg):
+    def inv_sub_bytes(self, msg):#returns the msg after the application of the inverse s_box transformation
         return bytearray([inv_s_box[i] for i in msg])
-    def inv_shift_rows(self, msg):
+
+    def inv_shift_rows(self, msg):#returns msg with row shifts of shift_rows reversed as specified by AES standards
         return bytearray(
         [msg[0],msg[13],msg[10],msg[7],
         msg[4],msg[1],msg[14],msg[11],
         msg[8],msg[5],msg[2],msg[15],
         msg[12],msg[9],msg[6],msg[3]])
-    def inv_mix_col(self, col):
+
+    def inv_mix_col(self, col):#returns col galios multiplied by the inv_column_mix array.
         b=bytearray()
         for j in range(0,4):
             tmp=0x00
@@ -138,79 +156,81 @@ class AES:
                 tmp^=self.multiply(inv_column_mix[j][i], col[i])
             b+=bytes([tmp])
         return b
-    def inv_mix_cols(self, msg):
+
+    def inv_mix_cols(self, msg):#return an bytearray made from concatenation of each column of message after inv_mix_col
         b=bytearray()
         for i in range (0,4):
             b+=self.inv_mix_col(msg[4*i:4*i+4])
         return(b)
 
-    def pad(self, msg):
+    def pad(self, msg): #returns the msg padded to a multiple of 16 bytes with the byte representing the number of pad characters
         if (len(msg))%16!=0:
             pad=16-(len(msg))%16
             for i in range(0, pad):
                 msg.append(pad)
         return msg
-    def un_pad(self, msg):
+    def un_pad(self, msg):#returns the reverse of the padding process
         pad=msg[-1]
         for i in range(0, pad):
             if msg[-1-i]==pad:
                 continue
             else:
-                print(i)
                 return(msg)
         return(bytearray(msg[0:len(msg)-pad]))
-    def word_keys(self, words):
+
+    def word_keys(self, words):#returns the concatenation of array words
         return bytearray(words[0]+words[1]+words[2]+words[3])
-    def cipher(self, plaintext):
-        msg=self.add_round_key(plaintext, self.round_keys[0])
-        for i in range(1, self.num_rounds):
+    
+    
+    def cipher(self, plaintext): #returns the result of the AES encryption algorithms rounds on one block of the full message using the mutation functions
+        msg=self.add_round_key(plaintext, self.round_keys[0]) #initial whitening
+        for i in range(1, self.num_rounds): #13 rounds
             msg=self.sub_bytes(msg)
             msg=self.shift_rows(msg)
             msg=self.mix_cols(msg)
             msg=self.add_round_key(msg,self.round_keys[i])
+        #final round, no mix_col
         msg=self.sub_bytes(msg)
         msg=self.shift_rows(msg)
         msg=self.add_round_key(msg,self.round_keys[-1])
         return(msg)
     def inv_cipher(self, ciphertext):
-        msg=self.add_round_key(ciphertext, self.round_keys[-1])
-        for i in range(self.num_rounds-1, 0, -1):
+        msg=self.add_round_key(ciphertext, self.round_keys[-1]) #initial reverse whitening
+        for i in range(self.num_rounds-1, 0, -1): #13 rounds
             msg=self.inv_shift_rows(msg)
             msg=self.inv_sub_bytes(msg)
             msg=self.add_round_key(msg, self.round_keys[i])
             msg=self.inv_mix_cols(msg)
+        #final round, no inv_mix_col
         msg=self.inv_shift_rows(msg)
         msg=self.inv_sub_bytes(msg)
         msg=self.add_round_key(msg,self.round_keys[0])
         return(msg)
+
+    #returns the result of inv_cipher on all blocks of msg
     def decrypt(self, msg):
-        #msg_bytes=(0x8e,0xa2,0xb7,0xca,0x51,0x67,0x45,0xbf,0xea,0xfc,0x49,0x90,0x4b,0x49,0x60,0x89)
         output=bytearray()
         for i in range(0,int(len(msg)/16)):      
             output+=self.inv_cipher(msg[16*i:16*i+16])
         output=self.un_pad(output)
         return output#.decode('utf-8')
+
+    #returns the result of encrypt on all blocks of msg. if string is True, encrypt expects a string, and if false it expects bytes.
     def encrypt(self, msg, string=True):
         if string:
             msg_bytes=bytearray(msg, 'utf-8')
         else:
             msg_bytes=bytearray(msg)
         msg_bytes=self.pad(msg_bytes)
-        #msg_bytes=(0x00,0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff)
         output=bytearray()
         for i in range(0,int(len(msg_bytes)/16)):      
             output+=self.cipher(msg_bytes[16*i:16*i+16])
         return output
 
 if __name__=="__main__":
-    #key_bytes=bytearray(key, 'utf-8')
-    #num_rounds=14
-    #key_bytes=(0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f)
-    #msg_bytes=bytearray(msg, 'utf-8')
-    #pad(msg_bytes)
     key="Vrz19NDnmgmqvJw0fm4R3Zadi7OLLVoA"
     msg="hello how's it going"
-    aes=AES(key,14)
+    aes=AES(key)
     output=aes.encrypt(msg)
     print(output)
     print(aes.decrypt(output))

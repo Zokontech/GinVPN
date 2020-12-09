@@ -5,11 +5,11 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="GinVPN-Zokontech", # Replace with your own username
-    version="0.0.7",
+    version="0.0.11",
     author="Zander Krasny",
     author_email="akrasny@ufl.edu",
     description="Psudo VPN using proxy.py",
-    install_requires=['proxy.py', 'aiohttp', 'PyAutoGUI'],
+    install_requires=['proxy.py', 'aiohttp',],
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
